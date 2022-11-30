@@ -1,1 +1,12 @@
+register_file.v
 pd.v
+imemory.v
+decoder.v
+control_logic.v
+alu.v
+branch_comp.v
+pc.v
+dmemory.v
+write_back.v
+forwarding_logic.v
+muxs.v
