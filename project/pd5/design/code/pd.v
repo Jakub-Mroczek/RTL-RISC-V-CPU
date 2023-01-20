@@ -31,7 +31,7 @@ module pd (
   wire PD5_R_WRITE_ENABLE;
   wire [4:0] PD5_R_READ_RS1 = PD5_D_RS1;
   wire [4:0] PD5_R_READ_RS2 = PD5_D_RS2;
-  wire [4:0] PD5_R_WRITE_DESTINATION = PD5_D_RD;
+  wire [4:0] PD5_R_WRITE_DESTINATION = W_INSN_RD;
   reg [31:0] PD5_R_READ_RS1_DATA;
   reg [31:0] PD5_R_READ_RS2_DATA;
 
@@ -52,19 +52,20 @@ module pd (
   wire BrEq;
   wire BrLT;
 
-  // DMEM
+  // Memory
   reg [31:0] PD5_M_PC = 32'h01000000;
-  wire [31:0] PD5_M_ADDRESS;
+  wire [31:0] PD5_M_ADDRESS = M_ALU;
   wire PD5_M_RW;
   wire [1:0] PD5_M_SIZE_ENCODED;
   reg [31:0] PD5_M_DATA;
   wire DMEM_DATA_SEL;
+  wire [31:0] M_wb_mux_data;
 
   // Writeback
   reg [31:0] PD5_W_PC = 32'h01000000;
   wire [1:0] PD5_W_ENABLE;
   wire [4:0] PD5_W_DESTINATION;
-  wire [31:0] PD5_W_DATA;
+  wire [31:0] PD5_W_DATA = W_DATA;
 
   // Pipeline
   wire stall;
@@ -177,6 +178,7 @@ module pd (
   reg [31:0] W_INSN_IMM;
   reg [4:0] W_INSN_SHAMT;
   reg [31:0] W_ALU;
+  reg [31:0] W_DATA;
 
   always @(posedge clock) begin
     if(reset) begin
@@ -189,6 +191,7 @@ module pd (
       W_INSN_IMM <= 0;
       W_INSN_SHAMT <= 0;
       W_ALU <= 0;
+      W_DATA <= 0;
     end
     else begin
       W_INSN_OPCODE <= M_INSN_OPCODE;
@@ -200,6 +203,7 @@ module pd (
       W_INSN_IMM <= M_INSN_IMM;
       W_INSN_SHAMT <= M_INSN_SHAMT;
       W_ALU <= M_ALU;
+      W_DATA <= M_wb_mux_data;
     end
   end
 
@@ -214,7 +218,7 @@ module pd (
 
   dmemory dmem_0 (
     .clock(clock),
-    .address(PD5_M_ADDRESS),
+    .address(M_ALU),
     .data_in(PD5_R_READ_RS2_DATA),
     .data_out(PD5_M_DATA),
     .read_write(PD5_M_RW),
@@ -239,7 +243,7 @@ module pd (
     .addr_rs1(PD5_R_READ_RS1),
     .addr_rs2(PD5_R_READ_RS2),
     .addr_rd(PD5_R_WRITE_DESTINATION),
-    .data_rd(PD5_W_DATA),
+    .data_rd(W_DATA),
     .data_rs1(PD5_R_READ_RS1_DATA),
     .data_rs2(PD5_R_READ_RS2_DATA)
   );
@@ -311,6 +315,14 @@ module pd (
     .output_b(ALU_INPUT_B)
   );
 
+  wb_mux wb_mux_0 (
+    .wb_sel(PD5_W_ENABLE),
+    .pc(PD5_M_PC + 4),
+    .alu_res(M_ALU),
+    .dmem_data_out(PD5_M_DATA),
+    .write_back_data_out(M_wb_mux_data)
+  );
+
   // alu_mux_old alu_mux_old_0 (
   //   .ASel(ASel),
   //   .BSel(BSel),
@@ -322,14 +334,14 @@ module pd (
   //   .output_b(ALU_INPUT_B)
   // );
 
-  write_back write_back_0 (
-    .clock(clock),
-    .wb_sel(PD5_W_ENABLE),
-    .pc(PD5_W_PC),
-    .alu_res(PD5_E_ALU_RES),
-    .dmem_data_out(PD5_M_DATA),
-    .write_back_data_out(PD5_W_DATA)
-  );
+  // write_back write_back_0 (
+  //   .clock(clock),
+  //   .wb_sel(PD5_W_ENABLE),
+  //   .pc(PD5_W_PC),
+  //   .alu_res(M_ALU),
+  //   .dmem_data_out(PD5_M_DATA),
+  //   .write_back_data_out(PD5_W_DATA)
+  // );
 
 
   forwarding_logic forwarding_logic_0 (
@@ -377,7 +389,7 @@ module pd (
     .ALUSel(ALUSel),
     .access_size(PD5_M_SIZE_ENCODED),
     .DMEM_RW(PD5_M_RW),
-    // .WBSel(PD5_W_ENABLE),
+    .WBSel(PD5_W_ENABLE),
     // .WALU_B_SEL(),
     .stall(stall)
   );

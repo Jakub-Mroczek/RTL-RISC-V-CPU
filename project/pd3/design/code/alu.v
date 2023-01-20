@@ -29,7 +29,7 @@ module alu (
     // ALU mode
     always @(*) begin
         case (ALUSel) 
-            // ADD/ADDI
+            // ADD/ADDI/AUIPC
             4'b1000: begin
                 alu_res = input_a + input_b;
             end
@@ -84,7 +84,7 @@ module alu (
             4'b1010: begin
                 alu_res = input_a ^ input_b;
             end
-            // JAL
+            // JAL/LUI
             4'b0001: begin
                 alu_res = input_b;
             end

@@ -43,6 +43,7 @@ module forwarding_logic (
     output reg [3:0] ALUSel,
     output reg [1:0] access_size,
     output reg DMEM_RW,
+    output reg [1:0] WBSel,
     // output reg [1:0] WALU_B_SEL,
     output reg stall
 );
@@ -55,8 +56,9 @@ module forwarding_logic (
                 PCSel = 1'b0;
                 BrUn = 1'b0;
                 stall = 1'b0;
+                access_size = 2'b10;
 
-                // MX bypass
+                // M/X bypass
                 if(X_INSN_RS1 == M_INSN_RD)
                     ALU_A_SEL = 2'b10;
                 else if(X_INSN_RS1 == W_INSN_RD)
@@ -119,6 +121,7 @@ module forwarding_logic (
                 BrUn = 1'b0;
                 ALU_B_SEL = 2'b01;
                 stall = 1'b0;
+                access_size = 2'b10;
 
                 if(X_INSN_RS1 == M_INSN_RD)
                     ALU_A_SEL = 2'b10;
@@ -168,8 +171,40 @@ module forwarding_logic (
                 PCSel = 1'b0;
                 BrUn = 1'b0;
                 ALUSel = 4'b1000;
-                ALU_A_SEL = 2'b00;
                 ALU_B_SEL = 2'b01;
+
+                case(X_INSN_FUNCT3)
+                    // LB
+                    3'b000: begin
+                        access_size = 2'b00;
+                    end
+                    // LH
+                    3'b001: begin
+                        access_size = 2'b01;
+                    end
+                    // LW
+                    3'b010: begin   
+                        access_size = 2'b10;               
+                    end
+                    // LBU
+                    3'b100: begin  
+                        access_size = 2'b00;                 
+                    end
+                    // LHU
+                    3'b101: begin
+                        access_size = 2'b01;
+                    end
+                    default:      
+                        access_size = 2'b10;      
+                endcase
+
+                // M/X bypass
+                if(X_INSN_RS1 == M_INSN_RD)
+                    ALU_A_SEL = 2'b10;
+                else if(X_INSN_RS1 == W_INSN_RD)
+                    ALU_A_SEL = 2'b11;
+                else
+                    ALU_A_SEL = 2'b00;
 
                 // load stall case
                 if(X_INSN_RD == D_INSN_RS1)
@@ -189,6 +224,23 @@ module forwarding_logic (
                 ALU_B_SEL = 2'b01;
                 stall = 1'b0;
 
+                case(X_INSN_FUNCT3)
+                    // SB
+                    3'b000: begin
+                        access_size = 2'b00;
+                    end
+                    // SH
+                    3'b001: begin
+                        access_size = 2'b01;
+                    end
+                    // SW
+                    3'b010: begin   
+                        access_size = 2'b10;               
+                    end
+                    default:      
+                        access_size = 2'b10;      
+                endcase   
+
                 if(X_INSN_RS1 == M_INSN_RD)
                     ALU_A_SEL = 2'b10;
                 else if(X_INSN_RS1 == W_INSN_RD)
@@ -202,6 +254,7 @@ module forwarding_logic (
                 ALU_A_SEL = 2'b01;
                 ALU_B_SEL = 2'b01;
                 stall = 1'b0;
+                access_size = 2'b10;
 
                 case(X_INSN_FUNCT3)
                     // BEQ
@@ -263,6 +316,7 @@ module forwarding_logic (
                 ALU_A_SEL = 2'b01;
                 ALU_B_SEL = 2'b01;
                 stall = 1'b0;
+                access_size = 2'b10;
             end
             // LUI
             7'b0110111: begin
@@ -272,6 +326,7 @@ module forwarding_logic (
                 ALU_A_SEL = 2'b01;
                 ALU_B_SEL = 2'b01;
                 stall = 1'b0;
+                access_size = 2'b10;
             end
             // JALR
             7'b1100111: begin
@@ -280,6 +335,7 @@ module forwarding_logic (
                 ALUSel = 4'b0010;
                 ALU_B_SEL = 2'b01;
                 stall = 1'b0;
+                access_size = 2'b10;
 
                 if(X_INSN_RS1 == M_INSN_RD)
                     ALU_A_SEL = 2'b10;
@@ -297,6 +353,7 @@ module forwarding_logic (
                 ALU_A_SEL = 2'b01;
                 ALU_B_SEL = 2'b01;
                 stall = 1'b0;
+                access_size = 2'b10;
             end           
             // By default set everything to NOP condition
             default: begin
@@ -306,52 +363,63 @@ module forwarding_logic (
                 ALU_A_SEL = 2'b01;
                 ALU_B_SEL = 2'b01;
                 stall = 1'b0;
+                access_size = 2'b10;
             end
         endcase
     end
 
     // writeback logic
     always @ (*) begin
-        case(W_INSN_OPCODE)
+        case(M_INSN_OPCODE)
             // R-types
             7'b0110011: begin
                 RegWEn = 1'b1;
+                WBSel = 2'b01;
             end 
             // I types
             7'b0010011: begin
                 RegWEn = 1'b1;
+                WBSel = 2'b01;
             end
             // I types but now they're loading wowza
             7'b0000011: begin
                 RegWEn = 1'b1;
+                WBSel = 2'b00;
             end
             // S types
             7'b0100011: begin
                 RegWEn = 1'b0;
+                WBSel = 2'b00; //WBSel = 2'bXX;
             end
             // B types
             7'b1100011: begin
                 RegWEn = 1'b0;
+                WBSel = 2'b00; //WBSel = 2'bXX;
             end
             // AUIPC
             7'b0010111: begin
                 RegWEn = 1'b1;
+                WBSel = 2'b01;
             end
             // LUI
             7'b0110111: begin
                 RegWEn = 1'b1;
+                WBSel = 2'b01;
             end
             // JALR
             7'b1100111: begin
                 RegWEn = 1'b1;
+                WBSel = 2'b10;
             end
             // JAL
             7'b1101111: begin
                 RegWEn = 1'b1;
+                WBSel = 2'b10;
             end           
             // By default set everything to NOP condition
             default: begin
                 RegWEn = 1'b0;
+                WBSel = 2'b00;
             end
         endcase
     end

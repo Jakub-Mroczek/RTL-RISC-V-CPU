@@ -215,7 +215,7 @@ module control_logic (
                 BrUn = 1'b0;
                 ASel = 1'b1;
                 BSel = 1'b1;
-                ALUSel = 4'b1000;
+                ALUSel = 4'b0001;
             end
 
             // JALR
